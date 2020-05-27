@@ -46,12 +46,19 @@ ui <- dashboardPage(
                   actionButton(inputId = "btn_loadData", label = "Load Data")
                 )
               ) # END fluidRow
-          ) # END box
+          ), # END box
+          box(title = "Data", width = 6, solidHeader = FALSE, status = "primary",
+            tableOutput(outputId = "dataTable")  
+          ) # End box
         ), # END fluidRow -
         fluidRow(
           box(title = "Distribution", width = 12, solidHeader = FALSE, status = "primary",
             sidebarPanel(
-              actionButton(inputId = "go_dist", label = "GO!")
+              #textInput(inputId = "dist_title", label = "Plot Title:", value = "distribution", width = NULL, placeholder = NULL),
+              #textInput(inputId = "dist_xAxis", label = "X-axis Title:", value = "x-axis", width = NULL, placeholder = NULL),
+              #textInput(inputId = "dist_yAxis", label = "Y-axis Title:", value = "y-axis", width = NULL, placeholder = NULL),
+              uiOutput(outputId = "dist_controls"),
+              actionButton(inputId = "dist_go", label = "GO!")
             ), # END sidebarPanel
             mainPanel(
               plotOutput(outputId = 'plot_dist', width = "100%", height = "400px", click = NULL,
@@ -104,13 +111,37 @@ server <- function(input, output){
 #  })
 #  output$plot_dist <- renderPlot({ hist(myData())})
  
+  
   data_signals  <- eventReactive(input$btn_loadData,{
     print("Loading Data...")
     df_signals <- read.csv(input$mulColBedG$datapath, header = input$header, sep = "\t", quote = "")
     num_signals <- ncol(df_signals)-3
     colnames(df_signals) <- c('chr', 'start', 'end', paste(input$prefix, 1:num_signals, sep=''))
     df_signals <- df_signals[ ,(4:(3+num_signals))]
-    
+    df_signals <- wideToLong(df_signals)
+    return(df_signals)
+  }) # END eventReactive
+  
+#  output$dataTable <- renderTable(data_signals()[1:5, ])
+  output$dataTable <- renderTable(head(data_signals()))
+  #output$dist_controls
+  #output$dataTable <- renderTable(head(data_signals()))
+  output$dist_controls <- renderUI({
+    axisName <- colnames(data_signals())
+    tagList(
+      #sliderInput("n", "N", 1, 1000, 500),
+      #textInput("label", "Label")
+      textInput(inputId = "dist_title", label = "Plot Title:",   value = "Distribution Curve", width = NULL, placeholder = NULL),
+      textInput(inputId = "dist_xAxis", label = "X-axis Title:", value = axisName[1], width = NULL, placeholder = NULL),
+      textInput(inputId = "dist_yAxis", label = "Y-axis Title:", value = axisName[2], width = NULL, placeholder = NULL),
+    )
+  })
+  
+#  data_signals  <- eventReactive(input$btn_loadData,{
+#    df_signals <- wideToLong(data_signals())
+#    return(df_signals)
+#  }) # END eventReactive
+  
 #    list_signals <- lapply(df_signals, FUN= function(col, per, en, nozero){
 #      col <- col[!is.na(col)]
 #      print(head(col))
@@ -119,17 +150,30 @@ server <- function(input, output){
 #      if(nozero){col <- col[which(col!= 0)]}
 #      return(col)
 #    }, input$percentile, input$enrichment, input$nozero)
-    
-    df_signals <- wideToLong(df_signals)
-    return(df_signals)
-  }) # END eventReactive
-  
-  output$plot_dist <- renderPlot({ 
+
+  plot_dist <- eventReactive(input$dist_go, {
+    #print("finished ggplot")
     ggplot(data_signals(), aes(x=value, y=variable, fill=variable)) +
       geom_density_ridges2(scale=0.9) + # rel_min_height = 0.01
       #labs(fill = "", x= 'mean enrichment' , y= 'feature' )+
+      ggtitle(input$dist_title) +  # for the main title
+      xlab(input$dist_xAxis) + # for the x axis label
+      ylab(input$dist_yAxis) + # for the y axis label
       theme_classic(base_size = 21)
+      #print("finished ggplot")    
   })
+      
+  output$plot_dist <- renderPlot({ 
+    plot_dist()
+#    #print("finished ggplot")
+#    ggplot(data_signals(), aes(x=value, y=variable, fill=variable)) +
+#      geom_density_ridges2(scale=0.9) + # rel_min_height = 0.01
+#      #labs(fill = "", x= 'mean enrichment' , y= 'feature' )+
+#      theme_classic(base_size = 21)
+#    #print("finished ggplot")
+  })
+  
+  
   
 }
 
